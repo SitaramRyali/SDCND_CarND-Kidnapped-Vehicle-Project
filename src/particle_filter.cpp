@@ -20,6 +20,8 @@
 
 using std::string;
 using std::vector;
+using std::normal_distribution;
+
 
 void ParticleFilter::init(double x, double y, double theta, double std[]) {
   /**
@@ -30,8 +32,37 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
    * NOTE: Consult particle_filter.h for more information about this method 
    *   (and others in this file).
    */
-  num_particles = 0;  // TODO: Set the number of particles
+	num_particles = 100;  // TODO: Set the number of particles
+	std::default_random_engine gen;
+	double std_x, std_y, std_theta;  // Standard deviations for x, y, and theta
+	std_x = std[0], std_y = std[1], std_theta = std[2]; // Sets standard deviations for x, y, and theta
+	// This line creates a normal (Gaussian) distribution for x
+	normal_distribution<double> dist_x(x, std_x);
+	// This line creates a normal (Gaussian) distribution for y
+	normal_distribution<double> dist_y(y, std_y);
+	// This line creates a normal (Gaussian) distribution for theta
+	normal_distribution<double> dist_theta(theta, std_theta);
 
+	
+	for (int i = 0; i < num_particles; ++i) {
+		double sample_x, sample_y, sample_theta;
+
+		// TODO: Sample from these normal distributions like this: 
+		//   sample_x = dist_x(gen);
+		//   where "gen" is the random engine initialized earlier.
+		particles.push_back(Particle());
+		particles[i].x = dist_x(gen);
+		particles[i].y = dist_y(gen);
+		particles[i].theta = dist_theta(gen);
+
+		// Print your samples to the terminal.
+		//std::cout << "Sample " << i + 1 << " " << sample_x << " " << sample_y << " "
+		//	<< sample_theta << std::endl;
+		weights.push_back(1);//set weights of all particles to 1
+
+	}
+	
+	is_initialized = true;
 }
 
 void ParticleFilter::prediction(double delta_t, double std_pos[], 
@@ -43,6 +74,25 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
    *  http://en.cppreference.com/w/cpp/numeric/random/normal_distribution
    *  http://www.cplusplus.com/reference/random/default_random_engine/
    */
+	for (int i = 0; i < num_particles; ++i) {
+		double p_x = particles[i].x;
+		double p_y = particles[i].y;
+		double p_theta = particles[i].theta;
+		if (yaw_rate == 0.0)
+		{
+			particles[i].x = p_x + (velocity * delta_t * cos(p_theta));
+			particles[i].y = p_y + (velocity * delta_t * sin(p_theta));
+			particles[i].theta = particles[i].theta;
+		}
+		else {
+			particles[i].x = p_x + velocity * (sin(p_theta+(yaw_rate*delta_t))-sin(yaw_rate)) / yaw_rate;
+			particles[i].y = p_y - velocity * (cos(p_theta + (yaw_rate * delta_t)) - cos(yaw_rate)) / yaw_rate;
+			particles[i].theta = particles[i].theta + yaw_rate * delta_t;
+		}
+
+	}
+
+
 
 }
 
@@ -56,6 +106,8 @@ void ParticleFilter::dataAssociation(vector<LandmarkObs> predicted,
    *   probably find it useful to implement this method and use it as a helper 
    *   during the updateWeights phase.
    */
+   // sort the vectors
+
 
 }
 
