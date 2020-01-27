@@ -32,7 +32,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
    * NOTE: Consult particle_filter.h for more information about this method 
    *   (and others in this file).
    */
-	num_particles = 100;  // TODO: Set the number of particles
+	num_particles = 1000;  // TODO: Set the number of particles
 	std::default_random_engine gen;
 	double std_x, std_y, std_theta;  // Standard deviations for x, y, and theta
 	std_x = std[0], std_y = std[1], std_theta = std[2]; // Sets standard deviations for x, y, and theta
@@ -74,20 +74,31 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
    *  http://en.cppreference.com/w/cpp/numeric/random/normal_distribution
    *  http://www.cplusplus.com/reference/random/default_random_engine/
    */
+	std::default_random_engine gen;
+	double std_x, std_y, std_theta;  // Standard deviations for x, y, and theta
+	std_x = std_pos[0], std_y = std_pos[1], std_theta = std_pos[2]; // Sets standard deviations for x, y, and theta
+	// This line creates a normal (Gaussian) distribution for velocity
+	normal_distribution<double> velocity_x_gauss(velocity, std_x);
+	// This line creates a normal (Gaussian) distribution for yaw_rate
+	normal_distribution<double> yaw_rate_gauss(yaw_rate, std_theta);
+
+
 	for (int i = 0; i < num_particles; ++i) {
 		double p_x = particles[i].x;
 		double p_y = particles[i].y;
 		double p_theta = particles[i].theta;
-		if (yaw_rate == 0.0)
+		double current_velocity = velocity_x_gauss(gen);
+		double current_yaw_rate = yaw_rate_gauss(gen);
+		if (current_yaw_rate == 0.0)
 		{
-			particles[i].x = p_x + (velocity * delta_t * cos(p_theta));
-			particles[i].y = p_y + (velocity * delta_t * sin(p_theta));
+			particles[i].x = p_x + (current_velocity * delta_t * cos(p_theta));
+			particles[i].y = p_y + (current_velocity * delta_t * sin(p_theta));
 			particles[i].theta = particles[i].theta;
 		}
 		else {
-			particles[i].x = p_x + velocity * (sin(p_theta+(yaw_rate*delta_t))-sin(yaw_rate)) / yaw_rate;
-			particles[i].y = p_y - velocity * (cos(p_theta + (yaw_rate * delta_t)) - cos(yaw_rate)) / yaw_rate;
-			particles[i].theta = particles[i].theta + yaw_rate * delta_t;
+			particles[i].x = p_x + current_velocity * (sin(p_theta+(current_yaw_rate *delta_t))-sin(current_yaw_rate)) / current_yaw_rate;
+			particles[i].y = p_y - current_velocity * (cos(p_theta + (current_yaw_rate * delta_t)) - cos(current_yaw_rate)) / current_yaw_rate;
+			particles[i].theta = particles[i].theta + current_yaw_rate * delta_t;
 		}
 
 	}
