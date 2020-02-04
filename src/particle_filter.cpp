@@ -39,6 +39,9 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 	}
 
 	num_particles = 100;  // TODO: Set the number of particles
+	
+	// default weight value is 1
+	weights = std::vector<double>(static_cast<unsigned long>(num_particles), 1.0);
 	std::default_random_engine gen;
 	double std_x, std_y, std_theta;  // Standard deviations for x, y, and theta
 	std_x = std[0], std_y = std[1], std_theta = std[2]; // Sets standard deviations for x, y, and theta
@@ -50,26 +53,26 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 	normal_distribution<double> dist_theta(theta, std_theta);
 
 	
-	for (int i = 0; i < num_particles; ++i) {
+	for (int i = 0; i < num_particles; i++) {
 		double sample_x, sample_y, sample_theta;
 
 		// TODO: Sample from these normal distributions like this: 
 		//   sample_x = dist_x(gen);
 		//   where "gen" is the random engine initialized earlier.
-		particles.push_back(Particle());
-		particles[i].id = i;
+		//particles.push_back(Particle());
+		particles[i].id = i;// make particle's identifier a particle's initial position in the particles array
 		particles[i].x = dist_x(gen);
 		particles[i].y = dist_y(gen);
 		particles[i].theta = dist_theta(gen);
 		particles[i].weight = 1;
-
 		// Print your samples to the terminal.
 		//std::cout << "Sample " << i + 1 << " " << sample_x << " " << sample_y << " "
 		//	<< sample_theta << std::endl;
-		weights.push_back(1);//set weights of all particles to 1
+		//weights.push_back(1);//set weights of all particles to 1
 
 	}
 	
+  	// initialization step is finished
 	is_initialized = true;
 }
 
@@ -86,20 +89,26 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
 	double std_x, std_y, std_theta;  // Standard deviations for x, y, and theta
 	std_x = std_pos[0], std_y = std_pos[1], std_theta = std_pos[2]; // Sets standard deviations for x, y, and theta
 	// This line creates a normal (Gaussian) distribution for velocity
-	normal_distribution<double> velocity_x_gauss(velocity, std_x);
+	//normal_distribution<double> velocity_x_gauss(velocity, std_x);
 	// This line creates a normal (Gaussian) distribution for y
 	//normal_distribution<double> dist_y(y, std_y);
 	// This line creates a normal (Gaussian) distribution for yaw_rate
-	normal_distribution<double> yaw_rate_gauss(yaw_rate, std_theta);
+	//normal_distribution<double> yaw_rate_gauss(yaw_rate, std_theta);
+	// This line creates a normal (Gaussian) distribution for x
+	normal_distribution<double> dist_x(0.0, std_x);
+	// This line creates a normal (Gaussian) distribution for y
+	normal_distribution<double> dist_y(0.0, std_y);
+	// This line creates a normal (Gaussian) distribution for theta
+	normal_distribution<double> dist_theta(0.0, std_theta);
 
 
 	for (int i = 0; i < num_particles; ++i) {
 		double p_x = particles[i].x;
 		double p_y = particles[i].y;
 		double p_theta = particles[i].theta;
-		double current_velocity = velocity_x_gauss(gen);
-		double current_yaw_rate = yaw_rate_gauss(gen);
-		if (current_yaw_rate == 0.0)
+		double current_velocity = velocity; //velocity_x_gauss(gen);
+		double current_yaw_rate = yaw_rate; //yaw_rate_gauss(gen);
+		if (fabs(current_yaw_rate < 0.000001)
 		{
 			particles[i].x = p_x + (current_velocity * delta_t * cos(p_theta));
 			particles[i].y = p_y + (current_velocity * delta_t * sin(p_theta));
@@ -110,11 +119,12 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
 			particles[i].y = p_y - current_velocity * (cos(p_theta + (current_yaw_rate * delta_t)) - cos(current_yaw_rate)) / current_yaw_rate;
 			particles[i].theta = particles[i].theta + current_yaw_rate * delta_t;
 		}
-
+		
+		// adding random Gaussian noise
+		particle[i].x += dist_x(gen);
+		particle[i].y += dist_y(gen);
+		particle[i].theta += dist_theta(gen);
 	}
-
-
-
 }
 
 void ParticleFilter::dataAssociation(vector<LandmarkObs> predicted, 
@@ -138,7 +148,7 @@ void ParticleFilter::dataAssociation(vector<LandmarkObs> predicted,
 		for (int j = 0; j < predicted.size(); j++)
 		{
 			nearest_dist = dist(predicted[j].x, predicted[j].y, observations[i].x, observations[i].y);
-			if (nearest_dist < past_dist)
+			if (nearest_dist <= past_dist)
 			{
 				save_id = j;
 				past_dist = nearest_dist;
