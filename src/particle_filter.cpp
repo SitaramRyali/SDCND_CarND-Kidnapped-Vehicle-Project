@@ -37,7 +37,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 		return;
 	}
 
-	num_particles = 1000;  // TODO: Set the number of particles
+	num_particles = 512;  // TODO: Set the number of particles
 	std::default_random_engine gen;
 	double std_x, std_y, std_theta;  // Standard deviations for x, y, and theta
 	std_x = std[0], std_y = std[1], std_theta = std[2]; // Sets standard deviations for x, y, and theta
@@ -162,7 +162,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
 				//looking at those in sensor range of the particle make the valid match
 				// If it is in range, put it in the distance vector for calculating nearest neighbor
-				double landmark_part_dist = sqrt(pow(particles[i].x - landmarks[k].x_f, 2) + pow(particles[i].y - landmarks[k].y_f, 2));
+				double landmark_part_dist = sqrt(pow(p_x - landmarks[k].x_f, 2) + pow(p_y - landmarks[k].y_f, 2));
 				if (landmark_part_dist <= sensor_range) {
 					landmark_obs_dist[k] = sqrt(pow(x_obs_map - landmarks[k].x_f, 2) + pow(y_obs_map - landmarks[k].y_f, 2));
 
@@ -181,7 +181,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			float mu_y = landmarks[min_pos].y_f;
 
 			// Calculate multi-variate Gaussian distribution
-			multiv_prob_dist = multiv_prob(std_x_lm, std_y_lm, x_obs_map, y_obs_map,
+			multiv_prob_dist *= multiv_prob(std_x_lm, std_y_lm, x_obs_map, y_obs_map,
 				mu_x, mu_y);
 
 
@@ -189,7 +189,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
 		// Update particle weights with combined multi-variate Gaussian distribution
 		particles[i].weight = multiv_prob_dist;
-		weights[i] = particles[i].weight;
+		weights[i] = multiv_prob_dist;
 
 	}
 
@@ -203,25 +203,18 @@ void ParticleFilter::resample() {
 	 *   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
 	 */
 
-	std::default_random_engine gen;
+	
 	//std::discrete_distribution<int> index_val(0, num_particles);
-	double beta = 0.0;
-	int index;
-	double max_w = *max_element(weights.begin(), weights.end());
-	std::uniform_real_distribution<double> beta_val(0.0, 2 * max_w);
-	std::uniform_int_distribution<int> distIndex(0, num_particles - 1);
+
+  	random_device rd;
+  	std::default_random_engine gen(rd());
+
 	vector<Particle> sampled_particles;
 	//generate the resampler with spiining weights
 	for (int i = 0; i < num_particles; i++)
 	{
-		index = distIndex(gen);
-		beta += beta_val(gen);
-		while (beta > weights[index])
-		{
-			beta -= weights[index];
-			index = (index + 1) % num_particles;
-		}
-		sampled_particles.push_back(particles[index]);
+		discrete_distribution<int> index(weights.begin(), weights.end());      
+		sampled_particles.push_back(particles[index(gen)]);
 	}
 	particles = sampled_particles;
 }
