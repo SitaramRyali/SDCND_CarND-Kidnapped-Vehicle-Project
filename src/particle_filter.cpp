@@ -15,8 +15,8 @@
 #include <random>
 #include <string>
 #include <vector>
-
 #include "helper_functions.h"
+
 
 using std::string;
 using std::vector;
@@ -37,7 +37,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 		return;
 	}
 
-	num_particles = 512;  // TODO: Set the number of particles
+	num_particles = 128;  // TODO: Set the number of particles
 	default_random_engine gen;
 	double std_x, std_y, std_theta;  // Standard deviations for x, y, and theta
 	std_x = std[0], std_y = std[1], std_theta = std[2]; // Sets standard deviations for x, y, and theta
@@ -53,12 +53,14 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 		// TODO: Sample from these normal distributions like this: 
 		//   sample_x = dist_x(gen);
 		//   where "gen" is the random engine initialized earlier.
-		particles.push_back(Particle());
-		particles[i].id = i;
-		particles[i].x = dist_x(gen);
-		particles[i].y = dist_y(gen);
-		particles[i].theta = dist_theta(gen);
-		particles[i].weight = 1;
+		//particles.push_back(Particle());
+		Particle particle;
+		particle.id = i;
+		particle.x = dist_x(gen);
+		particle.y = dist_y(gen);
+		particle.theta = dist_theta(gen);
+		particle.weight = 1;
+		particles.push_back(particle);
 
 		// Print your samples to the terminal.
 		//std::cout << "Sample " << i + 1 << " " << sample_x << " " << sample_y << " "
@@ -80,12 +82,7 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
 	default_random_engine gen;
 	double std_x, std_y, std_theta;  // Standard deviations for x, y, and theta
 	std_x = std_pos[0], std_y = std_pos[1], std_theta = std_pos[2]; // Sets standard deviations for x, y, and theta
-	// This line creates a normal (Gaussian) distribution for velocity
-	//normal_distribution<double> velocity_x_gauss(velocity, std_x);
-	// This line creates a normal (Gaussian) distribution for y
-	//normal_distribution<double> dist_y(y, std_y);
-	// This line creates a normal (Gaussian) distribution for yaw_rate
-	//normal_distribution<double> yaw_rate_gauss(yaw_rate, std_theta);
+
 	// This line creates a normal (Gaussian) distribution for x
 	normal_distribution<double> dist_x(0.0, std_x);
 	// This line creates a normal (Gaussian) distribution for y
@@ -98,18 +95,17 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
 		double p_x = particles[i].x;
 		double p_y = particles[i].y;
 		double p_theta = particles[i].theta;
-		double current_velocity = velocity; //velocity_x_gauss(gen);
-		double current_yaw_rate = yaw_rate; //yaw_rate_gauss(gen);
-		if (fabs(current_yaw_rate < 0.000001))
+
+		if (abs(yaw_rate) == 0)
 		{
-			particles[i].x = p_x + (current_velocity * delta_t * cos(p_theta));
-			particles[i].y = p_y + (current_velocity * delta_t * sin(p_theta));
+			particles[i].x = p_x + (velocity * delta_t * cos(p_theta));
+			particles[i].y = p_y + (velocity * delta_t * sin(p_theta));
 			//particles[i].theta = particles[i].theta;
 		}
 		else {
-			particles[i].x = p_x + ((current_velocity / current_yaw_rate) * (sin(p_theta + (current_yaw_rate * delta_t)) - sin(p_theta)));
-			particles[i].y = p_y - ((current_velocity / current_yaw_rate) * (cos(p_theta + (current_yaw_rate * delta_t)) - cos(p_theta)));
-			particles[i].theta = particles[i].theta + current_yaw_rate * delta_t;
+			particles[i].x = p_x + ((velocity / yaw_rate) * (sin(p_theta + (yaw_rate * delta_t)) - sin(p_theta)));
+			particles[i].y = p_y - ((velocity / yaw_rate) * (cos(p_theta + (yaw_rate * delta_t)) - cos(p_theta)));
+			particles[i].theta = particles[i].theta + yaw_rate * delta_t;
 		}
 
 		// adding random Gaussian noise
@@ -130,70 +126,96 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
   // First term of multi-variate normal Gaussian distribution calculated below
   // It stays the same so can be outside the loop
 	double std_x_lm, std_y_lm;// Standard deviations for lanmark positions x,y
-	std_x_lm = std_landmark[0], std_y_lm = std_landmark[1];// Sets standard deviations for x, y
-	double obs_x, obs_y;
+	std_x_lm = std_landmark[0];
+	std_y_lm = std_landmark[1];// Sets standard deviations for x, y
 
-	// Iterate through each particle
-	for (int i = 0; i < num_particles; ++i) {
 
-		// For calculating multi-variate Gaussian distribution of each observation, for each particle
-		double multiv_prob_dist = 1.0;
-		double p_x = particles[i].x;
-		double p_y = particles[i].y;
-		double p_theta = particles[i].theta;
+	for (int np = 0; np < num_particles; np++)
 
-		// For each observation
-		for (int j = 0; j < observations.size(); ++j) {
-			obs_x = observations[j].x;
-			obs_y = observations[j].y;
-			// transform to map x coordinate
-			double x_obs_map;
-			x_obs_map = p_x + (cos(p_theta) * obs_x) - (sin(p_theta) * obs_y);
+	{
+		// create a vector for the observations storage.
+		vector<LandmarkObs> predicted_observations;
+		LandmarkObs obs;
 
-			// transform to map y coordinate
-			double y_obs_map;
-			y_obs_map = p_y + (sin(p_theta) * obs_x) + (cos(p_theta) * obs_y);
+		for (int k = 0; k < observations.size(); k++)
 
-			
-			// Find nearest landmark
-			vector<Map::single_landmark_s> landmarks = map_landmarks.landmark_list;
-			vector<double> landmark_obs_dist(landmarks.size());
-			for (int k = 0; k < landmarks.size(); ++k) {
+		{
 
-				//looking at those in sensor range of the particle make the valid match
-				// If it is in range, put it in the distance vector for calculating nearest neighbor
-				double landmark_part_dist = sqrt(pow(p_x - landmarks[k].x_f, 2) + pow(p_y - landmarks[k].y_f, 2));
-				if (landmark_part_dist <= sensor_range) {
-					landmark_obs_dist[k] = sqrt(pow(x_obs_map - landmarks[k].x_f, 2) + pow(y_obs_map - landmarks[k].y_f, 2));
+			LandmarkObs trans_obs;
 
-				}
-				else {
-					// Need to fill those outside of distance with huge number, or they'll be a zero (and think they are closest)
-					landmark_obs_dist[k] = 999999.0;
+			obs = observations[k];
+
+			trans_obs.x = particles[np].x + obs.x * cos(particles[np].theta) - obs.y * sin(particles[np].theta);
+
+			trans_obs.y = particles[np].y + obs.x * sin(particles[np].theta) + obs.y * cos(particles[np].theta);
+
+			predicted_observations.push_back(trans_obs);
+
+		}
+		// make each particles weight to 1.0
+		particles[np].weight = 1.0;
+		// with this completed the observations conversion with each particle perspective
+		// each and every observation from our sensors are handled here.	   		 
+		for (int i = 0; i < predicted_observations.size(); i++)
+
+		{
+
+			double valid_dist = sensor_range;
+
+			int assosiated_pos = 0;
+
+
+
+			for (int j = 0; j < map_landmarks.landmark_list.size(); j++)
+
+			{
+
+				double nearest_dist = dist(predicted_observations[i].x, predicted_observations[i].y, map_landmarks.landmark_list[j].x_f, map_landmarks.landmark_list[j].y_f);
+
+				if (nearest_dist < valid_dist)
+
+				{
+
+					valid_dist = nearest_dist;
+
+					assosiated_pos = j;
 
 				}
 
 			}
 
-			// Associate the observation point with its nearest landmark neighbor
-			int min_pos = distance(landmark_obs_dist.begin(), min_element(landmark_obs_dist.begin(), landmark_obs_dist.end()));
-			float mu_x = landmarks[min_pos].x_f;
-			float mu_y = landmarks[min_pos].y_f;
 
-			// Calculate multi-variate Gaussian distribution
-			multiv_prob_dist *= multiv_prob(std_x_lm, std_y_lm, x_obs_map, y_obs_map,
-				mu_x, mu_y);
 
+			if (assosiated_pos != 0)
+
+			{
+
+				double landmark_obs_x = predicted_observations[i].x;
+				double landmark_obs_y = predicted_observations[i].y;
+				double nearest_landmark_x = map_landmarks.landmark_list[assosiated_pos].x_f;
+				double nearest_landmark_y = map_landmarks.landmark_list[assosiated_pos].y_f;
+
+				//double particle_weight = 1 / (2 * M_PI * std_x_lm * std_y_lm) * exp(-(pow(landmark_obs_x - nearest_landmark_x, 2) / (2 * pow(std_x_lm, 2)) + pow(landmark_obs_y - nearest_landmark_y, 2) / (2 * pow(std_y_lm, 2))));
+				double particle_weight = multiv_prob(std_x_lm, std_y_lm, landmark_obs_x, landmark_obs_y, nearest_landmark_x, nearest_landmark_y);
+				if (particle_weight > 0)
+
+				{
+
+					particles[np].weight *= particle_weight;
+
+				}
+
+			}
+
+			weights[np] = particles[np].weight;
 
 		}
-
-		// Update particle weights with combined multi-variate Gaussian distribution
-		particles[i].weight = multiv_prob_dist;
-		weights[i] = multiv_prob_dist;
 
 	}
 
 }
+
+
 
 void ParticleFilter::resample() {
 	/**
@@ -203,11 +225,11 @@ void ParticleFilter::resample() {
 	 *   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
 	 */
 
-	
-	//std::discrete_distribution<int> index_val(0, num_particles);
 
-  	//random_device rd;
-  	default_random_engine gen;
+	 //std::discrete_distribution<int> index_val(0, num_particles);
+
+	 //random_device rd;
+	default_random_engine gen;
 
 	vector<Particle> sampled_particles;
 	//generate the resampler with spinning weights
