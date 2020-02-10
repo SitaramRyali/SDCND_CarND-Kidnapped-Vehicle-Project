@@ -133,8 +133,10 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	for (int np = 0; np < num_particles; np++)
 
 	{
-		// create a vector for the observations storage.
-		vector<LandmarkObs> predicted_observations;
+		// make each particles weight to 1.0
+		particles[np].weight = 1.0;
+
+		//calculate the each observation and its nearby landmark
 		LandmarkObs obs;
 
 		for (int k = 0; k < observations.size(); k++)
@@ -149,28 +151,18 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
 			trans_obs.y = particles[np].y + obs.x * sin(particles[np].theta) + obs.y * cos(particles[np].theta);
 
-			predicted_observations.push_back(trans_obs);
-
-		}
-		// make each particles weight to 1.0
-		particles[np].weight = 1.0;
+			
 		// with this completed the observations conversion with each particle perspective
-		// each and every observation from our sensors are handled here.	   		 
-		for (int i = 0; i < predicted_observations.size(); i++)
-
-		{
-
+		// each and every observation from our sensors are handled here.
+		
 			double valid_dist = sensor_range;
-
 			int assosiated_pos = 0;
-
-
 
 			for (int j = 0; j < map_landmarks.landmark_list.size(); j++)
 
 			{
 
-				double nearest_dist = dist(predicted_observations[i].x, predicted_observations[i].y, map_landmarks.landmark_list[j].x_f, map_landmarks.landmark_list[j].y_f);
+				double nearest_dist = dist(trans_obs.x, trans_obs.y, map_landmarks.landmark_list[j].x_f, map_landmarks.landmark_list[j].y_f);
 
 				if (nearest_dist < valid_dist)
 
@@ -184,14 +176,12 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
 			}
 
-
-
 			if (assosiated_pos != 0)
 
 			{
 
-				double landmark_obs_x = predicted_observations[i].x;
-				double landmark_obs_y = predicted_observations[i].y;
+				double landmark_obs_x = trans_obs.x;
+				double landmark_obs_y = trans_obs.y;
 				double nearest_landmark_x = map_landmarks.landmark_list[assosiated_pos].x_f;
 				double nearest_landmark_y = map_landmarks.landmark_list[assosiated_pos].y_f;
 
